@@ -42,6 +42,8 @@ export default function TransactionsScreen() {
 
   // rows[iceCreamId] = { quantityTaken, quantityReturned }
   const [rows, setRows] = useState({});
+  // effectivePrices[iceCreamId] = price at time of transaction (frozen for historical records)
+  const [effectivePrices, setEffectivePrices] = useState({});
 
   useFocusEffect(
     useCallback(() => {
@@ -59,15 +61,20 @@ export default function TransactionsScreen() {
     getTransaction(selectedVendor.id, dateKey).then((record) => {
       if (record) {
         const loaded = {};
+        const prices = {};
         record.items.forEach((item) => {
           loaded[item.iceCreamId] = {
             quantityTaken: String(item.quantityTaken),
             quantityReturned: String(item.quantityReturned),
           };
+          // Use the price saved at the time of the transaction
+          if (item.priceAtTime != null) prices[item.iceCreamId] = item.priceAtTime;
         });
         setRows(loaded);
+        setEffectivePrices(prices);
       } else {
         setRows({});
+        setEffectivePrices({});
       }
     });
   }, [selectedVendor, selectedDate]);
@@ -92,14 +99,21 @@ export default function TransactionsScreen() {
     }
     const items = iceCreams.map((ic) => {
       const row = getRow(ic.id);
+      // Always save the current price so future price changes don't affect this record
+      const priceAtTime = effectivePrices[ic.id] ?? ic.price;
       return {
         iceCreamId: ic.id,
         quantityTaken: parseFloat(row.quantityTaken) || 0,
         quantityReturned: parseFloat(row.quantityReturned) || 0,
+        priceAtTime,
       };
     });
     const dateKey = formatDate(selectedDate);
     await saveTransaction(selectedVendor.id, dateKey, items);
+    // Update effectivePrices to reflect saved prices
+    const prices = {};
+    iceCreams.forEach((ic) => { prices[ic.id] = effectivePrices[ic.id] ?? ic.price; });
+    setEffectivePrices(prices);
     Alert.alert('Saved', 'Transaction saved successfully.');
   };
 
@@ -107,7 +121,12 @@ export default function TransactionsScreen() {
     const row = getRow(ic.id);
     return { iceCreamId: ic.id, quantityTaken: row.quantityTaken, quantityReturned: row.quantityReturned };
   });
-  const { subtotal, deduction, finalAmount } = calcSummary(rowsForCalc, iceCreams);
+  // Use effectivePrices (historical) if available, otherwise fall back to current price
+  const iceCreamsWithEffectivePrices = iceCreams.map((ic) => ({
+    ...ic,
+    price: effectivePrices[ic.id] ?? ic.price,
+  }));
+  const { subtotal, deduction, finalAmount } = calcSummary(rowsForCalc, iceCreamsWithEffectivePrices);
 
   return (
     <View style={styles.container}>
@@ -175,15 +194,16 @@ export default function TransactionsScreen() {
               {/* Data rows */}
               {iceCreams.map((ic, index) => {
                 const row = getRow(ic.id);
+                const price = effectivePrices[ic.id] ?? ic.price;
                 const diff = calcDifference(row.quantityTaken, row.quantityReturned);
-                const total = calcRowTotal(diff, ic.price);
+                const total = calcRowTotal(diff, price);
                 const isEven = index % 2 === 0;
                 return (
                   <View key={ic.id} style={[styles.tableRow, isEven && styles.rowEven]}>
                     <Text style={[styles.cell, styles.colName]} numberOfLines={2}>
                       {ic.name}
                     </Text>
-                    <Text style={[styles.cell, styles.colPrice]}>₹{ic.price.toFixed(0)}</Text>
+                    <Text style={[styles.cell, styles.colPrice]}>₹{price.toFixed(0)}</Text>
                     <TextInput
                       style={[styles.cell, styles.colQty, styles.inputCell]}
                       value={row.quantityTaken}
