@@ -22,9 +22,7 @@ export default function BackupScreen() {
       const json = JSON.stringify(data, null, 2);
       const date = new Date().toISOString().slice(0, 10);
       const path = `${FileSystem.cacheDirectory}icecream_backup_${date}.json`;
-      await FileSystem.writeAsStringAsync(path, json, {
-        encoding: FileSystem.EncodingType.UTF8,
-      });
+      await FileSystem.writeAsStringAsync(path, json);
       const canShare = await Sharing.isAvailableAsync();
       if (!canShare) {
         Alert.alert('Error', 'Sharing is not available on this device.');
@@ -50,9 +48,7 @@ export default function BackupScreen() {
       if (result.canceled) return;
 
       const fileUri = result.assets[0].uri;
-      const content = await FileSystem.readAsStringAsync(fileUri, {
-        encoding: FileSystem.EncodingType.UTF8,
-      });
+      const content = await FileSystem.readAsStringAsync(fileUri);
       const data = JSON.parse(content);
 
       Alert.alert(
