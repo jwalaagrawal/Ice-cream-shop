@@ -18,6 +18,7 @@ import {
   getVendors,
   getTransaction,
   saveTransaction,
+  getPriceOnDate,
 } from '../storage/store';
 import { calcDifference, calcRowTotal, calcSummary } from '../utils/calculations';
 
@@ -54,30 +55,43 @@ export default function TransactionsScreen() {
     }, [])
   );
 
-  // Load existing record when vendor or date changes
+  // Load existing record + effective prices when vendor or date changes
   useEffect(() => {
-    if (!selectedVendor) return;
+    if (!selectedVendor || iceCreams.length === 0) return;
     const dateKey = formatDate(selectedDate);
-    getTransaction(selectedVendor.id, dateKey).then((record) => {
+
+    const load = async () => {
+      // Fetch the price effective on the selected date for every ice cream
+      const priceEntries = await Promise.all(
+        iceCreams.map(async (ic) => {
+          const p = await getPriceOnDate(ic.id, dateKey, ic.price);
+          return [ic.id, p];
+        })
+      );
+      const basePrices = Object.fromEntries(priceEntries);
+
+      const record = await getTransaction(selectedVendor.id, dateKey);
       if (record) {
         const loaded = {};
-        const prices = {};
+        const prices = { ...basePrices };
         record.items.forEach((item) => {
           loaded[item.iceCreamId] = {
             quantityTaken: String(item.quantityTaken),
             quantityReturned: String(item.quantityReturned),
           };
-          // Use the price saved at the time of the transaction
+          // Saved priceAtTime takes priority over history lookup
           if (item.priceAtTime != null) prices[item.iceCreamId] = item.priceAtTime;
         });
         setRows(loaded);
         setEffectivePrices(prices);
       } else {
         setRows({});
-        setEffectivePrices({});
+        setEffectivePrices(basePrices);
       }
-    });
-  }, [selectedVendor, selectedDate]);
+    };
+
+    load();
+  }, [selectedVendor, selectedDate, iceCreams]);
 
   const updateRow = (iceCreamId, field, value) => {
     setRows((prev) => ({
@@ -97,9 +111,20 @@ export default function TransactionsScreen() {
       Alert.alert('Select Vendor', 'Please select a vendor first.');
       return;
     }
+    // Validate returned <= taken for all ice creams
+    const invalid = iceCreams.filter((ic) => {
+      const row = getRow(ic.id);
+      const taken = parseFloat(row.quantityTaken) || 0;
+      const returned = parseFloat(row.quantityReturned) || 0;
+      return returned > taken;
+    });
+    if (invalid.length > 0) {
+      const names = invalid.map((ic) => ic.name).join(', ');
+      Alert.alert('Invalid Quantity', `Returned cannot be greater than Taken for: ${names}`);
+      return;
+    }
     const items = iceCreams.map((ic) => {
       const row = getRow(ic.id);
-      // Always save the current price so future price changes don't affect this record
       const priceAtTime = effectivePrices[ic.id] ?? ic.price;
       return {
         iceCreamId: ic.id,
@@ -110,7 +135,6 @@ export default function TransactionsScreen() {
     });
     const dateKey = formatDate(selectedDate);
     await saveTransaction(selectedVendor.id, dateKey, items);
-    // Update effectivePrices to reflect saved prices
     const prices = {};
     iceCreams.forEach((ic) => { prices[ic.id] = effectivePrices[ic.id] ?? ic.price; });
     setEffectivePrices(prices);
@@ -195,6 +219,9 @@ export default function TransactionsScreen() {
               {iceCreams.map((ic, index) => {
                 const row = getRow(ic.id);
                 const price = effectivePrices[ic.id] ?? ic.price;
+                const taken = parseFloat(row.quantityTaken) || 0;
+                const returned = parseFloat(row.quantityReturned) || 0;
+                const isReturnedInvalid = returned > taken;
                 const diff = calcDifference(row.quantityTaken, row.quantityReturned);
                 const total = calcRowTotal(diff, price);
                 const isEven = index % 2 === 0;
@@ -213,7 +240,8 @@ export default function TransactionsScreen() {
                       placeholderTextColor="#ccc"
                     />
                     <TextInput
-                      style={[styles.cell, styles.colQty, styles.inputCell]}
+                      style={[styles.cell, styles.colQty, styles.inputCell,
+                        isReturnedInvalid && styles.inputError]}
                       value={row.quantityReturned}
                       onChangeText={(v) => updateRow(ic.id, 'quantityReturned', v)}
                       keyboardType="decimal-pad"
@@ -363,6 +391,10 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     textAlign: 'center',
     marginVertical: 4,
+  },
+  inputError: {
+    borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
   },
 
   colName: { width: COL_NAME },

@@ -12,9 +12,14 @@ import {
   Platform,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { getIceCreams, saveIceCreams } from '../storage/store';
+import { getIceCreams, saveIceCreams, recordPriceChange } from '../storage/store';
 
 const genId = () => `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+const todayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 export default function IceCreamsScreen() {
   const [iceCreams, setIceCreams] = useState([]);
@@ -54,12 +59,19 @@ export default function IceCreamsScreen() {
       Alert.alert('Error', 'Enter a valid price greater than 0.');
       return;
     }
-    const updated = editId
-      ? iceCreams.map((i) =>
-          i.id === editId ? { ...i, name: trimmedName, price: parsedPrice } : i
-        )
-      : [...iceCreams, { id: genId(), name: trimmedName, price: parsedPrice }];
+    let updated;
+    let newId = null;
+    if (editId) {
+      updated = iceCreams.map((i) =>
+        i.id === editId ? { ...i, name: trimmedName, price: parsedPrice } : i
+      );
+    } else {
+      newId = genId();
+      updated = [...iceCreams, { id: newId, name: trimmedName, price: parsedPrice }];
+    }
     await saveIceCreams(updated);
+    // Record price change so historical transactions use the correct price
+    await recordPriceChange(editId || newId, parsedPrice, todayStr());
     setIceCreams(updated);
     setModalVisible(false);
   };
