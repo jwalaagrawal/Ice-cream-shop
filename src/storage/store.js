@@ -61,9 +61,12 @@ export const getPriceOnDate = async (iceCreamId, dateStr, fallbackPrice) => {
   const history = raw ? JSON.parse(raw) : {};
   const entries = history[iceCreamId];
   if (!entries || entries.length === 0) return fallbackPrice;
+  // Find the latest entry where from <= dateStr
   const applicable = entries.filter((e) => e.from <= dateStr);
-  if (applicable.length === 0) return entries[0].price;
-  return applicable[applicable.length - 1].price;
+  // If no applicable entry, use the earliest known price (original price before any change)
+  return applicable.length > 0
+    ? applicable[applicable.length - 1].price
+    : entries[0].price;
 };
 
 export const getAllData = async () => {
@@ -116,4 +119,33 @@ export const cleanupOldTransactions = async () => {
     await AsyncStorage.setItem(KEYS.TRANSACTIONS, JSON.stringify(cleaned));
   }
   return removed;
+};
+
+// Seeds an initial price history entry (dated 2000-01-01) for any ice cream
+// that has no history yet, so old dates always resolve to the original price.
+export const initializePriceHistory = async () => {
+  const iceCreams = await getIceCreams();
+  if (iceCreams.length === 0) return;
+  const raw = await AsyncStorage.getItem(KEYS.PRICE_HISTORY);
+  const history = raw ? JSON.parse(raw) : {};
+  let changed = false;
+  iceCreams.forEach((ic) => {
+    if (!history[ic.id] || history[ic.id].length === 0) {
+      // No history at all — seed with current price from the beginning of time
+      history[ic.id] = [{ price: ic.price, from: '2000-01-01' }];
+      changed = true;
+    } else {
+      // Has history but no baseline entry — add one before all existing entries
+      const hasBaseline = history[ic.id].some((e) => e.from === '2000-01-01');
+      if (!hasBaseline) {
+        // Use the earliest recorded price as the original
+        const earliest = history[ic.id][0].price;
+        history[ic.id].unshift({ price: earliest, from: '2000-01-01' });
+        changed = true;
+      }
+    }
+  });
+  if (changed) {
+    await AsyncStorage.setItem(KEYS.PRICE_HISTORY, JSON.stringify(history));
+  }
 };

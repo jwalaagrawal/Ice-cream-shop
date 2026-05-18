@@ -7,7 +7,7 @@ import IceCreamsScreen from './src/screens/IceCreamsScreen';
 import VendorsScreen from './src/screens/VendorsScreen';
 import TransactionsScreen from './src/screens/TransactionsScreen';
 import BackupScreen from './src/screens/BackupScreen';
-import { cleanupOldTransactions } from './src/storage/store';
+import { cleanupOldTransactions, initializePriceHistory } from './src/storage/store';
 
 const Tab = createBottomTabNavigator();
 
@@ -44,7 +44,8 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
-    // Clean up transactions older than 30 days silently on startup
+    // Seed initial price history + clean up old transactions on every startup
+    initializePriceHistory();
     cleanupOldTransactions();
     const timer = setTimeout(() => setShowSplash(false), 2000);
     return () => clearTimeout(timer);
