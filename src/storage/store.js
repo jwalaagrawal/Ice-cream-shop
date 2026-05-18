@@ -94,3 +94,26 @@ export const restoreAllData = async (data) => {
     AsyncStorage.setItem(KEYS.PRICE_HISTORY, JSON.stringify(data.priceHistory || {})),
   ]);
 };
+
+// Removes transactions older than 30 days. Returns count of removed records.
+export const cleanupOldTransactions = async () => {
+  const raw = await AsyncStorage.getItem(KEYS.TRANSACTIONS);
+  if (!raw) return 0;
+  const parsed = JSON.parse(raw);
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 30);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const cleaned = {};
+  let removed = 0;
+  Object.entries(parsed).forEach(([key, record]) => {
+    if (record.date >= cutoffStr) {
+      cleaned[key] = record;
+    } else {
+      removed++;
+    }
+  });
+  if (removed > 0) {
+    await AsyncStorage.setItem(KEYS.TRANSACTIONS, JSON.stringify(cleaned));
+  }
+  return removed;
+};

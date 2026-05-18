@@ -123,16 +123,18 @@ export default function TransactionsScreen() {
       Alert.alert('Invalid Quantity', `Returned cannot be greater than Taken for: ${names}`);
       return;
     }
-    const items = iceCreams.map((ic) => {
-      const row = getRow(ic.id);
-      const priceAtTime = effectivePrices[ic.id] ?? ic.price;
-      return {
-        iceCreamId: ic.id,
-        quantityTaken: parseFloat(row.quantityTaken) || 0,
-        quantityReturned: parseFloat(row.quantityReturned) || 0,
-        priceAtTime,
-      };
-    });
+    const items = iceCreams
+      .map((ic) => {
+        const row = getRow(ic.id);
+        const priceAtTime = effectivePrices[ic.id] ?? ic.price;
+        return {
+          iceCreamId: ic.id,
+          quantityTaken: parseFloat(row.quantityTaken) || 0,
+          quantityReturned: parseFloat(row.quantityReturned) || 0,
+          priceAtTime,
+        };
+      })
+      .filter((item) => item.quantityTaken > 0 || item.quantityReturned > 0);
     const dateKey = formatDate(selectedDate);
     await saveTransaction(selectedVendor.id, dateKey, items);
     const prices = {};
