@@ -41,6 +41,11 @@ export const subscribeTransaction = (vendorId, date, callback) =>
     callback(snap.exists() ? snap.data() : null)
   );
 
+export const subscribeAllTransactions = (callback) =>
+  onSnapshot(collection(db, 'transactions'), (snap) =>
+    callback(snap.docs.map((d) => d.data()))
+  );
+
 export const saveTransaction = (vendorId, date, items) =>
   setDoc(doc(db, 'transactions', `${vendorId}__${date}`), {
     vendorId,

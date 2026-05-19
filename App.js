@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import IceCreamsScreen from './src/screens/IceCreamsScreen';
 import VendorsScreen from './src/screens/VendorsScreen';
 import TransactionsScreen from './src/screens/TransactionsScreen';
-import BackupScreen from './src/screens/BackupScreen';
+import TotalsScreen from './src/screens/TotalsScreen';
 import {
   cleanupOldTransactions,
   migrateFromAsyncStorage,
@@ -20,7 +20,7 @@ const TAB_ICON = {
   'Ice Creams': '🍦',
   Vendors: '🧑‍💼',
   Transactions: '📋',
-  Backup: '💾',
+  Totals: '📊',
 };
 
 function SplashScreen() {
@@ -107,7 +107,7 @@ export default function App() {
         <Tab.Screen name="Ice Creams" component={IceCreamsScreen} options={{ headerTitle: '🍦  Ice Creams' }} />
         <Tab.Screen name="Vendors" component={VendorsScreen} options={{ headerTitle: '🧑‍💼  Vendors' }} />
         <Tab.Screen name="Transactions" component={TransactionsScreen} options={{ headerTitle: '📋  Transactions' }} />
-        <Tab.Screen name="Backup" component={BackupScreen} options={{ headerTitle: '💾  Backup & Restore' }} />
+        <Tab.Screen name="Totals" component={TotalsScreen} options={{ headerTitle: '📊  Monthly Totals' }} />
       </Tab.Navigator>
     </NavigationContainer>
   );
