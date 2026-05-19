@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { getVendors, saveVendors } from '../storage/store';
+import { subscribeVendors, saveVendor, deleteVendor } from '../firebase/store';
 
 const genId = () => `${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
@@ -21,11 +20,12 @@ export default function VendorsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [name, setName] = useState('');
 
-  useFocusEffect(
-    useCallback(() => {
-      getVendors().then(setVendors);
-    }, [])
-  );
+  useEffect(() => {
+    const unsubscribe = subscribeVendors((items) =>
+      setVendors(items.sort((a, b) => a.name.localeCompare(b.name)))
+    );
+    return unsubscribe;
+  }, []);
 
   const openAdd = () => {
     setName('');
@@ -45,9 +45,7 @@ export default function VendorsScreen() {
       Alert.alert('Error', 'A vendor with this name already exists.');
       return;
     }
-    const updated = [...vendors, { id: genId(), name: trimmedName }];
-    await saveVendors(updated);
-    setVendors(updated);
+    await saveVendor({ id: genId(), name: trimmedName });
     setModalVisible(false);
   };
 
@@ -57,11 +55,7 @@ export default function VendorsScreen() {
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: async () => {
-          const updated = vendors.filter((v) => v.id !== id);
-          await saveVendors(updated);
-          setVendors(updated);
-        },
+        onPress: () => deleteVendor(id),
       },
     ]);
   };

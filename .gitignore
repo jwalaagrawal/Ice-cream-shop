@@ -3,6 +3,10 @@
 # dependencies
 node_modules/
 
+# environment variables (Firebase keys)
+.env
+.env.local
+
 # Expo
 .expo/
 dist/

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,12 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { getIceCreams, saveIceCreams, recordPriceChange } from '../storage/store';
+import {
+  subscribeIceCreams,
+  saveIceCream,
+  deleteIceCream,
+  recordPriceChange,
+} from '../firebase/store';
 
 const genId = () => `${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
@@ -28,11 +32,12 @@ export default function IceCreamsScreen() {
   const [price, setPrice] = useState('');
   const [editId, setEditId] = useState(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      getIceCreams().then(setIceCreams);
-    }, [])
-  );
+  useEffect(() => {
+    const unsubscribe = subscribeIceCreams((items) =>
+      setIceCreams(items.sort((a, b) => a.name.localeCompare(b.name)))
+    );
+    return unsubscribe;
+  }, []);
 
   const openAdd = () => {
     setEditId(null);
@@ -59,20 +64,9 @@ export default function IceCreamsScreen() {
       Alert.alert('Error', 'Enter a valid price greater than 0.');
       return;
     }
-    let updated;
-    let newId = null;
-    if (editId) {
-      updated = iceCreams.map((i) =>
-        i.id === editId ? { ...i, name: trimmedName, price: parsedPrice } : i
-      );
-    } else {
-      newId = genId();
-      updated = [...iceCreams, { id: newId, name: trimmedName, price: parsedPrice }];
-    }
-    await saveIceCreams(updated);
-    // Record price change so historical transactions use the correct price
-    await recordPriceChange(editId || newId, parsedPrice, todayStr());
-    setIceCreams(updated);
+    const id = editId || genId();
+    await saveIceCream({ id, name: trimmedName, price: parsedPrice });
+    await recordPriceChange(id, parsedPrice, todayStr());
     setModalVisible(false);
   };
 
@@ -82,11 +76,7 @@ export default function IceCreamsScreen() {
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: async () => {
-          const updated = iceCreams.filter((i) => i.id !== id);
-          await saveIceCreams(updated);
-          setIceCreams(updated);
-        },
+        onPress: () => deleteIceCream(id),
       },
     ]);
   };

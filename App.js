@@ -2,14 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { StatusBar, Platform, View, Text, StyleSheet, Animated } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import IceCreamsScreen from './src/screens/IceCreamsScreen';
 import VendorsScreen from './src/screens/VendorsScreen';
 import TransactionsScreen from './src/screens/TransactionsScreen';
 import BackupScreen from './src/screens/BackupScreen';
-import { cleanupOldTransactions, initializePriceHistory } from './src/storage/store';
+import {
+  cleanupOldTransactions,
+  migrateFromAsyncStorage,
+} from './src/firebase/store';
 
 const Tab = createBottomTabNavigator();
+const MIGRATION_KEY = 'firebase_migrated_v1';
 
 const TAB_ICON = {
   'Ice Creams': '🍦',
@@ -44,9 +49,29 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
-    // Seed initial price history + clean up old transactions on every startup
-    initializePriceHistory();
-    cleanupOldTransactions();
+    const startup = async () => {
+      // One-time migration: upload existing local data to Firestore
+      const migrated = await AsyncStorage.getItem(MIGRATION_KEY);
+      if (!migrated) {
+        try {
+          const [icsRaw, vendsRaw, transRaw] = await Promise.all([
+            AsyncStorage.getItem('icecreams'),
+            AsyncStorage.getItem('vendors'),
+            AsyncStorage.getItem('transactions'),
+          ]);
+          await migrateFromAsyncStorage({
+            iceCreams: icsRaw ? JSON.parse(icsRaw) : [],
+            vendors: vendsRaw ? JSON.parse(vendsRaw) : [],
+            transactions: transRaw ? JSON.parse(transRaw) : {},
+          });
+          await AsyncStorage.setItem(MIGRATION_KEY, 'true');
+        } catch (_) {}
+      }
+      // Clean up Firestore transactions older than 30 days
+      cleanupOldTransactions().catch(() => {});
+    };
+
+    startup();
     const timer = setTimeout(() => setShowSplash(false), 2000);
     return () => clearTimeout(timer);
   }, []);
@@ -73,71 +98,25 @@ export default function App() {
             paddingTop: 6,
             height: Platform.OS === 'ios' ? 80 : 60,
           },
-          tabBarLabelStyle: {
-            fontSize: 12,
-            fontWeight: '600',
-          },
-          headerStyle: {
-            backgroundColor: '#2E86AB',
-            elevation: 0,
-            shadowOpacity: 0,
-          },
+          tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
+          headerStyle: { backgroundColor: '#2E86AB', elevation: 0, shadowOpacity: 0 },
           headerTintColor: '#fff',
-          headerTitleStyle: {
-            fontWeight: '700',
-            fontSize: 18,
-          },
+          headerTitleStyle: { fontWeight: '700', fontSize: 18 },
         })}
       >
-        <Tab.Screen
-          name="Ice Creams"
-          component={IceCreamsScreen}
-          options={{ headerTitle: '🍦  Ice Creams' }}
-        />
-        <Tab.Screen
-          name="Vendors"
-          component={VendorsScreen}
-          options={{ headerTitle: '🧑‍💼  Vendors' }}
-        />
-        <Tab.Screen
-          name="Transactions"
-          component={TransactionsScreen}
-          options={{ headerTitle: '📋  Transactions' }}
-        />
-        <Tab.Screen
-          name="Backup"
-          component={BackupScreen}
-          options={{ headerTitle: '💾  Backup & Restore' }}
-        />
+        <Tab.Screen name="Ice Creams" component={IceCreamsScreen} options={{ headerTitle: '🍦  Ice Creams' }} />
+        <Tab.Screen name="Vendors" component={VendorsScreen} options={{ headerTitle: '🧑‍💼  Vendors' }} />
+        <Tab.Screen name="Transactions" component={TransactionsScreen} options={{ headerTitle: '📋  Transactions' }} />
+        <Tab.Screen name="Backup" component={BackupScreen} options={{ headerTitle: '💾  Backup & Restore' }} />
       </Tab.Navigator>
     </NavigationContainer>
   );
 }
 
 const splash = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#2E86AB',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoBox: {
-    alignItems: 'center',
-  },
-  emoji: {
-    fontSize: 90,
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#fff',
-    letterSpacing: 0.5,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: 'rgba(255,255,255,0.75)',
-    marginTop: 6,
-    fontWeight: '500',
-  },
+  container: { flex: 1, backgroundColor: '#2E86AB', alignItems: 'center', justifyContent: 'center' },
+  logoBox: { alignItems: 'center' },
+  emoji: { fontSize: 90, marginBottom: 16 },
+  title: { fontSize: 28, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
+  subtitle: { fontSize: 15, color: 'rgba(255,255,255,0.75)', marginTop: 6, fontWeight: '500' },
 });

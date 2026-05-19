@@ -10,7 +10,7 @@ import {
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
-import { getAllData, restoreAllData } from '../storage/store';
+import { getAllData, restoreAllData } from '../firebase/store';
 
 export default function BackupScreen() {
   const [loading, setLoading] = useState(false);
