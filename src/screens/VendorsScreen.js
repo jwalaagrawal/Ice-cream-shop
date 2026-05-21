@@ -32,7 +32,7 @@ export default function VendorsScreen() {
     setModalVisible(true);
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     const trimmedName = name.trim();
     if (!trimmedName) {
       Alert.alert('Error', 'Vendor name is required.');
@@ -45,8 +45,9 @@ export default function VendorsScreen() {
       Alert.alert('Error', 'A vendor with this name already exists.');
       return;
     }
-    await saveVendor({ id: genId(), name: trimmedName });
     setModalVisible(false);
+    saveVendor({ id: genId(), name: trimmedName })
+      .catch((e) => Alert.alert('Save Failed', e?.message || 'Could not save. Check your internet connection.'));
   };
 
   const handleDelete = (id) => {

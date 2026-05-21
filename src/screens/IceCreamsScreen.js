@@ -54,7 +54,7 @@ export default function IceCreamsScreen() {
     setModalVisible(true);
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     const trimmedName = name.trim();
     const parsedPrice = parseFloat(price);
     if (!trimmedName) {
@@ -66,13 +66,10 @@ export default function IceCreamsScreen() {
       return;
     }
     const id = editId || genId();
-    try {
-      await saveIceCream({ id, name: trimmedName, price: parsedPrice });
-      await recordPriceChange(id, parsedPrice, todayStr());
-      setModalVisible(false);
-    } catch (e) {
-      Alert.alert('Save Failed', e?.message || 'Could not save. Check your internet connection.');
-    }
+    setModalVisible(false);
+    saveIceCream({ id, name: trimmedName, price: parsedPrice })
+      .catch((e) => Alert.alert('Save Failed', e?.message || 'Could not save. Check your internet connection.'));
+    recordPriceChange(id, parsedPrice, todayStr()).catch(() => {});
   };
 
   const handleDelete = (id) => {
