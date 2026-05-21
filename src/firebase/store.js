@@ -7,8 +7,11 @@ import {
   getDoc,
   getDocs,
   writeBatch,
+  enableNetwork as firestoreEnableNetwork,
 } from 'firebase/firestore';
 import { db } from './config';
+
+export const enableNetwork = () => firestoreEnableNetwork(db);
 
 // ─── ICE CREAMS ───────────────────────────────────────────────────────────────
 

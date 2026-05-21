@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StatusBar, Platform, View, Text, StyleSheet, Animated } from 'react-native';
+import { StatusBar, Platform, View, Text, StyleSheet, Animated, AppState } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,6 +11,7 @@ import TotalsScreen from './src/screens/TotalsScreen';
 import {
   cleanupOldTransactions,
   migrateFromAsyncStorage,
+  enableNetwork,
 } from './src/firebase/store';
 
 const Tab = createBottomTabNavigator();
@@ -72,8 +73,12 @@ export default function App() {
     };
 
     startup();
+    // Re-enable Firestore network when app comes back to foreground
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') enableNetwork().catch(() => {});
+    });
     const timer = setTimeout(() => setShowSplash(false), 2000);
-    return () => clearTimeout(timer);
+    return () => { clearTimeout(timer); sub.remove(); };
   }, []);
 
   if (showSplash) return <SplashScreen />;
