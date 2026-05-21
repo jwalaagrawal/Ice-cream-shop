@@ -33,8 +33,9 @@ export default function IceCreamsScreen() {
   const [editId, setEditId] = useState(null);
 
   useEffect(() => {
-    const unsubscribe = subscribeIceCreams((items) =>
-      setIceCreams(items.sort((a, b) => a.name.localeCompare(b.name)))
+    const unsubscribe = subscribeIceCreams(
+      (items) => setIceCreams(items.sort((a, b) => a.name.localeCompare(b.name))),
+      (e) => Alert.alert('Firebase Error', e?.message || 'Could not load ice creams.')
     );
     return unsubscribe;
   }, []);
@@ -65,9 +66,13 @@ export default function IceCreamsScreen() {
       return;
     }
     const id = editId || genId();
-    await saveIceCream({ id, name: trimmedName, price: parsedPrice });
-    await recordPriceChange(id, parsedPrice, todayStr());
-    setModalVisible(false);
+    try {
+      await saveIceCream({ id, name: trimmedName, price: parsedPrice });
+      await recordPriceChange(id, parsedPrice, todayStr());
+      setModalVisible(false);
+    } catch (e) {
+      Alert.alert('Save Failed', e?.message || 'Could not save. Check your internet connection.');
+    }
   };
 
   const handleDelete = (id) => {

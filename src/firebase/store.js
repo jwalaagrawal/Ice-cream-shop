@@ -15,9 +15,10 @@ export const enableNetwork = () => firestoreEnableNetwork(db);
 
 // ─── ICE CREAMS ───────────────────────────────────────────────────────────────
 
-export const subscribeIceCreams = (callback) =>
-  onSnapshot(collection(db, 'icecreams'), (snap) =>
-    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+export const subscribeIceCreams = (callback, onError) =>
+  onSnapshot(collection(db, 'icecreams'),
+    (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    onError || ((e) => console.error('subscribeIceCreams:', e))
   );
 
 export const saveIceCream = (iceCream) =>
