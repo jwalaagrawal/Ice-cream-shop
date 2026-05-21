@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { StatusBar, Platform, View, Text, StyleSheet, Animated, AppState } from 'react-native';
+import { StatusBar, View, Text, StyleSheet, Animated, AppState } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import IceCreamsScreen from './src/screens/IceCreamsScreen';
@@ -81,9 +82,10 @@ export default function App() {
     return () => { clearTimeout(timer); sub.remove(); };
   }, []);
 
-  if (showSplash) return <SplashScreen />;
+  if (showSplash) return <SafeAreaProvider><SplashScreen /></SafeAreaProvider>;
 
   return (
+    <SafeAreaProvider>
     <NavigationContainer>
       <StatusBar barStyle="light-content" backgroundColor="#2E86AB" />
       <Tab.Navigator
@@ -99,9 +101,7 @@ export default function App() {
             backgroundColor: '#fff',
             borderTopWidth: 1,
             borderTopColor: '#E5E7EB',
-            paddingBottom: Platform.OS === 'ios' ? 20 : 6,
             paddingTop: 6,
-            height: Platform.OS === 'ios' ? 80 : 60,
           },
           tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
           headerStyle: { backgroundColor: '#2E86AB', elevation: 0, shadowOpacity: 0 },
@@ -115,6 +115,7 @@ export default function App() {
         <Tab.Screen name="Totals" component={TotalsScreen} options={{ headerTitle: '📊  Monthly Totals' }} />
       </Tab.Navigator>
     </NavigationContainer>
+    </SafeAreaProvider>
   );
 }
 
