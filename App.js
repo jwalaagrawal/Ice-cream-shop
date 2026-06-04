@@ -3,6 +3,7 @@ import { StatusBar, View, Text, StyleSheet, Animated, AppState } from 'react-nat
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import IceCreamsScreen from './src/screens/IceCreamsScreen';
@@ -85,6 +86,7 @@ export default function App() {
   if (showSplash) return <SafeAreaProvider><SplashScreen /></SafeAreaProvider>;
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <SafeAreaProvider>
     <NavigationContainer>
       <StatusBar barStyle="light-content" backgroundColor="#2E86AB" />
@@ -116,6 +118,7 @@ export default function App() {
       </Tab.Navigator>
     </NavigationContainer>
     </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 

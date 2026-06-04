@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
-  FlatList,
   TextInput,
   TouchableOpacity,
   Modal,
@@ -11,11 +10,14 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatlist';
 import {
   subscribeIceCreams,
   saveIceCream,
   deleteIceCream,
   recordPriceChange,
+  subscribeIceCreamOrder,
+  saveIceCreamOrder,
 } from '../firebase/store';
 
 const genId = () => `${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -27,18 +29,29 @@ const todayStr = () => {
 
 export default function IceCreamsScreen() {
   const [iceCreams, setIceCreams] = useState([]);
+  const [iceCreamOrder, setIceCreamOrder] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [editId, setEditId] = useState(null);
 
   useEffect(() => {
-    const unsubscribe = subscribeIceCreams(
-      (items) => setIceCreams(items.sort((a, b) => a.name.localeCompare(b.name))),
+    const u1 = subscribeIceCreams(
+      (items) => setIceCreams(items),
       (e) => Alert.alert('Firebase Error', e?.message || 'Could not load ice creams.')
     );
-    return unsubscribe;
+    const u2 = subscribeIceCreamOrder((order) => setIceCreamOrder(order));
+    return () => { u1(); u2(); };
   }, []);
+
+  const sortedIceCreams = useMemo(() => {
+    if (iceCreamOrder.length === 0) return iceCreams;
+    const map = Object.fromEntries(iceCreams.map((ic) => [ic.id, ic]));
+    const ordered = iceCreamOrder.map((id) => map[id]).filter(Boolean);
+    const inOrder = new Set(iceCreamOrder);
+    const unordered = iceCreams.filter((ic) => !inOrder.has(ic.id));
+    return [...ordered, ...unordered];
+  }, [iceCreams, iceCreamOrder]);
 
   const openAdd = () => {
     setEditId(null);
@@ -67,6 +80,10 @@ export default function IceCreamsScreen() {
     }
     const id = editId || genId();
     setModalVisible(false);
+    if (!editId) {
+      const newOrder = [...iceCreamOrder, id];
+      saveIceCreamOrder(newOrder).catch(() => {});
+    }
     saveIceCream({ id, name: trimmedName, price: parsedPrice })
       .catch((e) => Alert.alert('Save Failed', e?.message || 'Could not save. Check your internet connection.'));
     recordPriceChange(id, parsedPrice, todayStr()).catch(() => {});
@@ -78,34 +95,57 @@ export default function IceCreamsScreen() {
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: () => deleteIceCream(id),
+        onPress: () => {
+          deleteIceCream(id).catch(() => {});
+          saveIceCreamOrder(iceCreamOrder.filter((oid) => oid !== id)).catch(() => {});
+        },
       },
     ]);
   };
 
+  const onDragEnd = ({ data }) => {
+    const newOrder = data.map((ic) => ic.id);
+    saveIceCreamOrder(newOrder).catch(() => {});
+  };
+
   return (
     <View style={styles.container}>
-      <FlatList
-        data={iceCreams}
-        keyExtractor={(i) => i.id}
+      <DraggableFlatList
+        data={sortedIceCreams}
+        keyExtractor={(item) => item.id}
+        onDragEnd={onDragEnd}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <Text style={styles.empty}>No ice creams added yet. Tap below to add one.</Text>
         }
-        renderItem={({ item }) => (
-          <TouchableOpacity style={styles.card} onPress={() => openEdit(item)}>
-            <View style={styles.cardInfo}>
-              <Text style={styles.cardName}>{item.name}</Text>
-              <Text style={styles.cardPrice}>₹{item.price.toFixed(2)} per unit</Text>
-            </View>
+        renderItem={({ item, drag, isActive }) => (
+          <ScaleDecorator>
             <TouchableOpacity
-              onPress={() => handleDelete(item.id)}
-              style={styles.deleteBtn}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={[styles.card, isActive && styles.cardActive]}
+              onPress={() => openEdit(item)}
+              activeOpacity={0.8}
             >
-              <Text style={styles.deleteText}>✕</Text>
+              <TouchableOpacity
+                onLongPress={drag}
+                delayLongPress={150}
+                style={styles.dragHandle}
+                hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
+              >
+                <Text style={styles.dragIcon}>☰</Text>
+              </TouchableOpacity>
+              <View style={styles.cardInfo}>
+                <Text style={styles.cardName}>{item.name}</Text>
+                <Text style={styles.cardPrice}>₹{item.price.toFixed(2)} per unit</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => handleDelete(item.id)}
+                style={styles.deleteBtn}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.deleteText}>✕</Text>
+              </TouchableOpacity>
             </TouchableOpacity>
-          </TouchableOpacity>
+          </ScaleDecorator>
         )}
       />
       <TouchableOpacity style={styles.addBtn} onPress={openAdd}>
@@ -178,6 +218,18 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
   },
+  cardActive: {
+    elevation: 8,
+    shadowOpacity: 0.18,
+    backgroundColor: '#F0F9FF',
+  },
+  dragHandle: {
+    paddingRight: 12,
+    paddingLeft: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dragIcon: { fontSize: 18, color: '#C0C8D4' },
   cardInfo: { flex: 1 },
   cardName: { fontSize: 16, fontWeight: '600', color: '#1A1A2E' },
   cardPrice: { fontSize: 13, color: '#666', marginTop: 3 },

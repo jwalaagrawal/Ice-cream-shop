@@ -26,6 +26,15 @@ export const saveIceCream = (iceCream) =>
 
 export const deleteIceCream = (id) => deleteDoc(doc(db, 'icecreams', id));
 
+export const subscribeIceCreamOrder = (callback) =>
+  onSnapshot(doc(db, 'settings', 'icecreamOrder'),
+    (snap) => callback(snap.exists() ? snap.data().order || [] : []),
+    (e) => console.error('subscribeIceCreamOrder:', e)
+  );
+
+export const saveIceCreamOrder = (order) =>
+  setDoc(doc(db, 'settings', 'icecreamOrder'), { order });
+
 // ─── VENDORS ──────────────────────────────────────────────────────────────────
 
 export const subscribeVendors = (callback) =>
