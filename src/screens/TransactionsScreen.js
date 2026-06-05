@@ -18,6 +18,7 @@ import {
   subscribeTransaction,
   saveTransaction,
   getPriceOnDate,
+  subscribeIceCreamOrder,
 } from '../firebase/store';
 import { calcDifference, calcRowTotal, calcSummary } from '../utils/calculations';
 
@@ -33,6 +34,7 @@ const displayDate = (date) =>
 
 export default function TransactionsScreen() {
   const [iceCreams, setIceCreams] = useState([]);
+  const [iceCreamOrder, setIceCreamOrder] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -45,24 +47,23 @@ export default function TransactionsScreen() {
 
   // Subscribe to ice creams + vendors
   useEffect(() => {
-    const u1 = subscribeIceCreams((items) =>
-      setIceCreams(items.sort((a, b) => a.name.localeCompare(b.name)))
-    );
+    const u1 = subscribeIceCreams((items) => setIceCreams(items));
     const u2 = subscribeVendors((items) =>
       setVendors(items.sort((a, b) => a.name.localeCompare(b.name)))
     );
-    return () => { u1(); u2(); };
+    const u3 = subscribeIceCreamOrder((order) => setIceCreamOrder(order));
+    return () => { u1(); u2(); u3(); };
   }, []);
 
   // Load effective prices and subscribe to transaction when vendor/date changes
   useEffect(() => {
-    if (!selectedVendor || iceCreams.length === 0) return;
+    if (!selectedVendor || sortedIceCreams.length === 0) return;
     isDirty.current = false;
     const dateKey = formatDate(selectedDate);
 
     // Fetch historical price for each ice cream on the selected date
     Promise.all(
-      iceCreams.map(async (ic) => {
+      sortedIceCreams.map(async (ic) => {
         const p = await getPriceOnDate(ic.id, dateKey, ic.price);
         return [ic.id, p];
       })
@@ -94,7 +95,7 @@ export default function TransactionsScreen() {
     });
 
     return unsubscribe;
-  }, [selectedVendor, selectedDate, iceCreams]);
+  }, [selectedVendor, selectedDate, sortedIceCreams]);
 
   const updateRow = (iceCreamId, field, value) => {
     isDirty.current = true;
@@ -112,7 +113,7 @@ export default function TransactionsScreen() {
       Alert.alert('Select Vendor', 'Please select a vendor first.');
       return;
     }
-    const invalid = iceCreams.filter((ic) => {
+    const invalid = sortedIceCreams.filter((ic) => {
       const row = getRow(ic.id);
       return (parseFloat(row.quantityReturned) || 0) > (parseFloat(row.quantityTaken) || 0);
     });
@@ -123,7 +124,7 @@ export default function TransactionsScreen() {
       );
       return;
     }
-    const items = iceCreams
+    const items = sortedIceCreams
       .map((ic) => {
         const row = getRow(ic.id);
         return {
@@ -140,11 +141,19 @@ export default function TransactionsScreen() {
     Alert.alert('Saved', 'Transaction saved successfully.');
   };
 
-  const iceCreamsWithEffectivePrices = iceCreams.map((ic) => ({
+  const sortedIceCreams = React.useMemo(() => {
+    if (iceCreamOrder.length === 0) return iceCreams;
+    const map = Object.fromEntries(iceCreams.map((ic) => [ic.id, ic]));
+    const ordered = iceCreamOrder.map((id) => map[id]).filter(Boolean);
+    const inOrder = new Set(iceCreamOrder);
+    return [...ordered, ...iceCreams.filter((ic) => !inOrder.has(ic.id))];
+  }, [iceCreams, iceCreamOrder]);
+
+  const iceCreamsWithEffectivePrices = sortedIceCreams.map((ic) => ({
     ...ic,
     price: effectivePrices[ic.id] ?? ic.price,
   }));
-  const rowsForCalc = iceCreams.map((ic) => ({
+  const rowsForCalc = sortedIceCreams.map((ic) => ({
     iceCreamId: ic.id,
     ...getRow(ic.id),
   }));
@@ -190,7 +199,7 @@ export default function TransactionsScreen() {
           <Text style={styles.placeholderIcon}>📋</Text>
           <Text style={styles.placeholderText}>Select a vendor to enter transaction details</Text>
         </View>
-      ) : iceCreams.length === 0 ? (
+      ) : sortedIceCreams.length === 0 ? (
         <View style={styles.placeholder}>
           <Text style={styles.placeholderIcon}>🍦</Text>
           <Text style={styles.placeholderText}>No ice creams found. Add some in the Ice Creams tab.</Text>
@@ -207,7 +216,7 @@ export default function TransactionsScreen() {
                 <Text style={[styles.cell, styles.headerCell, styles.colQty]}>Diff</Text>
                 <Text style={[styles.cell, styles.headerCell, styles.colTotal]}>Total (₹)</Text>
               </View>
-              {iceCreams.map((ic, index) => {
+              {sortedIceCreams.map((ic, index) => {
                 const row = getRow(ic.id);
                 const price = effectivePrices[ic.id] ?? ic.price;
                 const taken = parseFloat(row.quantityTaken) || 0;
