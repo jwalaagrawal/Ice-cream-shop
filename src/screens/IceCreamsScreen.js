@@ -30,6 +30,7 @@ const todayStr = () => {
 export default function IceCreamsScreen() {
   const [iceCreams, setIceCreams] = useState([]);
   const [iceCreamOrder, setIceCreamOrder] = useState([]);
+  const [orderLoaded, setOrderLoaded] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
@@ -40,9 +41,19 @@ export default function IceCreamsScreen() {
       (items) => setIceCreams(items),
       (e) => Alert.alert('Firebase Error', e?.message || 'Could not load ice creams.')
     );
-    const u2 = subscribeIceCreamOrder((order) => setIceCreamOrder(order));
+    const u2 = subscribeIceCreamOrder((order) => {
+      setIceCreamOrder(order);
+      setOrderLoaded(true);
+    });
     return () => { u1(); u2(); };
   }, []);
+
+  // If the order document doesn't exist yet, seed it from the current ice cream list
+  useEffect(() => {
+    if (orderLoaded && iceCreams.length > 0 && iceCreamOrder.length === 0) {
+      saveIceCreamOrder(iceCreams.map((ic) => ic.id)).catch(() => {});
+    }
+  }, [orderLoaded, iceCreams, iceCreamOrder]);
 
   const sortedIceCreams = useMemo(() => {
     if (iceCreamOrder.length === 0) return iceCreams;
