@@ -59,11 +59,13 @@ export const subscribeAllTransactions = (callback) =>
     callback(snap.docs.map((d) => d.data()))
   );
 
-export const saveTransaction = (vendorId, date, items) =>
+export const saveTransaction = (vendorId, date, items, change = 0, paid = 0) =>
   setDoc(doc(db, 'transactions', `${vendorId}__${date}`), {
     vendorId,
     date,
     items,
+    change,
+    paid,
     savedAt: new Date().toISOString(),
   });
 

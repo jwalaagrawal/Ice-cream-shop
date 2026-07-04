@@ -42,6 +42,8 @@ export default function TransactionsScreen() {
   const [showVendorPicker, setShowVendorPicker] = useState(false);
   const [rows, setRows] = useState({});
   const [effectivePrices, setEffectivePrices] = useState({});
+  const [change, setChange] = useState('');
+  const [paid, setPaid] = useState('');
   // Track whether the user has made unsaved edits (prevents remote updates overwriting local typing)
   const isDirty = useRef(false);
 
@@ -59,6 +61,8 @@ export default function TransactionsScreen() {
   useEffect(() => {
     if (!selectedVendor || sortedIceCreams.length === 0) return;
     isDirty.current = false;
+    setChange('');
+    setPaid('');
     const dateKey = formatDate(selectedDate);
 
     // Fetch historical price for each ice cream on the selected date
@@ -81,6 +85,8 @@ export default function TransactionsScreen() {
           };
         });
         setRows(loaded);
+        setChange(record.change ? String(record.change) : '');
+        setPaid(record.paid ? String(record.paid) : '');
         // Override effectivePrices with saved priceAtTime values
         setEffectivePrices((prev) => {
           const updated = { ...prev };
@@ -91,6 +97,8 @@ export default function TransactionsScreen() {
         });
       } else {
         setRows({});
+        setChange('');
+        setPaid('');
       }
     });
 
@@ -136,7 +144,7 @@ export default function TransactionsScreen() {
       })
       .filter((item) => item.quantityTaken > 0 || item.quantityReturned > 0);
 
-    await saveTransaction(selectedVendor.id, formatDate(selectedDate), items);
+    await saveTransaction(selectedVendor.id, formatDate(selectedDate), items, parseFloat(change) || 0, parseFloat(paid) || 0);
     isDirty.current = false;
     Alert.alert('Saved', 'Transaction saved successfully.');
   };
@@ -158,6 +166,9 @@ export default function TransactionsScreen() {
     ...getRow(ic.id),
   }));
   const { subtotal, deduction, finalAmount } = calcSummary(rowsForCalc, iceCreamsWithEffectivePrices);
+  const changeVal = parseFloat(change) || 0;
+  const paidVal = parseFloat(paid) || 0;
+  const balanceDue = finalAmount + changeVal - paidVal;
 
   return (
     <View style={styles.container}>
@@ -264,9 +275,43 @@ export default function TransactionsScreen() {
               <Text style={styles.summaryLabel}>20% Commission Deduction</Text>
               <Text style={[styles.summaryValue, styles.deductionText]}>− ₹{deduction.toFixed(2)}</Text>
             </View>
-            <View style={[styles.summaryRow, styles.finalRow]}>
+            <View style={styles.summaryRow}>
               <Text style={styles.finalLabel}>Amount to Pay</Text>
               <Text style={styles.finalValue}>₹{finalAmount.toFixed(2)}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Change</Text>
+              <View style={styles.inputRow}>
+                <Text style={styles.inputPrefix}>+ ₹</Text>
+                <TextInput
+                  style={styles.summaryInput}
+                  value={change}
+                  onChangeText={(v) => { isDirty.current = true; setChange(v); }}
+                  keyboardType="decimal-pad"
+                  placeholder="0"
+                  placeholderTextColor="#ccc"
+                />
+              </View>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Paid</Text>
+              <View style={styles.inputRow}>
+                <Text style={[styles.inputPrefix, styles.deductionText]}>− ₹</Text>
+                <TextInput
+                  style={styles.summaryInput}
+                  value={paid}
+                  onChangeText={(v) => { isDirty.current = true; setPaid(v); }}
+                  keyboardType="decimal-pad"
+                  placeholder="0"
+                  placeholderTextColor="#ccc"
+                />
+              </View>
+            </View>
+            <View style={[styles.summaryRow, styles.finalRow]}>
+              <Text style={styles.finalLabel}>Balance Due</Text>
+              <Text style={[styles.finalValue, balanceDue < 0 && styles.negativeBalance]}>
+                ₹{balanceDue.toFixed(2)}
+              </Text>
             </View>
           </View>
 
@@ -348,6 +393,14 @@ const styles = StyleSheet.create({
   finalRow: { borderBottomWidth: 0, marginTop: 8, paddingTop: 12, borderTopWidth: 2, borderTopColor: '#E5E7EB' },
   finalLabel: { fontSize: 16, fontWeight: '700', color: '#1A1A2E' },
   finalValue: { fontSize: 18, fontWeight: '800', color: '#16A34A' },
+  negativeBalance: { color: '#EF4444' },
+  inputRow: { flexDirection: 'row', alignItems: 'center' },
+  inputPrefix: { fontSize: 14, fontWeight: '600', color: '#1A1A2E', marginRight: 2 },
+  summaryInput: {
+    borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 5, fontSize: 14, fontWeight: '600',
+    color: '#1A1A2E', backgroundColor: '#F9FAFB', minWidth: 80, textAlign: 'right',
+  },
   saveBtn: {
     marginHorizontal: 16, marginBottom: 16, backgroundColor: '#16A34A', borderRadius: 12,
     paddingVertical: 16, alignItems: 'center', elevation: 4,
